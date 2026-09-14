@@ -1,0 +1,6 @@
+streamlit
+pandas
+huggingface_hub
+supabase
+matplotlib
+plotly
