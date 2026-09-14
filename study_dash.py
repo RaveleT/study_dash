@@ -1,5 +1,13 @@
 import streamlit as st
 from supabase import create_client, Client
+from datetime import datetime
+
+data = {
+    "subject": subject_input,
+    "notes": markdown_content,
+    "focus_state": "File Upload",
+    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+}
 
 st.set_page_config(page_title="Study Logs App", page_icon="📚", layout="centered")
 
