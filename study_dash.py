@@ -2,7 +2,7 @@ from datetime import datetime
 import streamlit as st
 from supabase import Client, create_client
 
-st.set_page_config(page_title="Study Logs App", page_icon="📚", layout="centered")
+st.set_page_config(page_title="MAT 2247 Study Logs", page_icon="📚", layout="centered")
 
 # Initialize Supabase Client
 url = st.secrets["SUPABASE_URL"]
@@ -15,7 +15,7 @@ if "authenticated" not in st.session_state:
 
 # PIN Login Screen
 if not st.session_state["authenticated"]:
-    st.title("🔒 Enter PIN to Access")
+    st.title("🔒 Enter PIN to Access Notes")
     
     with st.form("pin_form"):
         entered_pin = st.text_input("PIN", type="password", max_chars=6)
@@ -35,14 +35,21 @@ else:
         st.session_state["authenticated"] = False
         st.rerun()
 
-    st.title("📚 Study Logs & Markdown Manager")
+    st.title("📚 MAT 2247: Numerical Analysis II Notes")
 
-    tab1, tab2 = st.tabs(["View Logs", "Upload Markdown"])
+    tab1, tab2 = st.tabs(["View Study Logs", "Upload Markdown Notes"])
 
     with tab1:
-        st.header("Saved Study Notes")
+        st.header("Saved Lecture & Chapter Notes")
+        
+        # Subject filter option
+        selected_subject = st.selectbox("Filter by Subject", ["All", "MAT 2247: Numerical Analysis II", "General Notes"])
+        
         try:
-            response = supabase.table("logs").select("*").order("id", desc=True).execute()
+            query = supabase.table("logs").select("*").order("id", desc=True)
+            if selected_subject != "All":
+                query = query.eq("subject", selected_subject)
+            response = query.execute()
             logs = response.data
         except Exception as e:
             st.error(f"Failed to fetch data: {e}")
@@ -54,20 +61,19 @@ else:
             for log in logs:
                 subject = log.get("subject", "Untitled Subject")
                 timestamp = log.get("timestamp", "Recent")
-                exam_type = log.get("test_exam", "")
+                focus_state = log.get("focus_state", "Standard")
                 notes = log.get("notes", "No markdown content provided.")
                 
-                header_text = f"**{subject}** ({timestamp})"
-                if exam_type:
-                    header_text += f" — *{exam_type}*"
+                header_text = f"**{subject}** ({timestamp}) — *{focus_state}*"
                     
                 with st.expander(header_text):
                     st.markdown(notes)
 
     with tab2:
-        st.header("Upload Markdown File")
-        uploaded_file = st.file_uploader("Choose a Markdown file", type=["md", "txt"])
-        subject_input = st.text_input("Subject Name", "General Notes")
+        st.header("Upload Chapter Markdown")
+        uploaded_file = st.file_uploader("Choose a Markdown file (.md)", type=["md", "txt"])
+        subject_input = st.text_input("Subject Name", "MAT 2247: Numerical Analysis II")
+        focus_input = st.selectbox("Category", ["Chapter Notes", "Lecture Example", "Algorithm Reference", "File Upload"])
         
         if uploaded_file is not None and st.button("Upload to Database"):
             markdown_content = uploaded_file.read().decode("utf-8")
@@ -75,7 +81,7 @@ else:
                 data = {
                     "subject": subject_input,
                     "notes": markdown_content,
-                    "focus_state": "File Upload",
+                    "focus_state": focus_input,
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 }
                 supabase.table("logs").insert(data).execute()
