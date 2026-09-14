@@ -1,5 +1,4 @@
 from datetime import datetime
-import markdown
 import streamlit as st
 from supabase import Client, create_client
 
@@ -63,9 +62,7 @@ else:
                     header_text += f" — *{exam_type}*"
                     
                 with st.expander(header_text):
-                    # Process markdown and LaTeX math safely for Streamlit Cloud
-                    html_notes = markdown.markdown(notes, extensions=["markdown_math"])
-                    st.markdown(html_notes, unsafe_allow_html=True)
+                    st.markdown(notes)
 
     with tab2:
         st.header("Upload Markdown File")
