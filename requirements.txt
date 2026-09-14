@@ -4,6 +4,5 @@ huggingface_hub
 supabase
 matplotlib
 plotly
-text
 markdown 
 python-markdown-math
