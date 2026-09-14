@@ -62,7 +62,6 @@ else:
                     header_text += f" — *{exam_type}*"
                     
                 with st.expander(header_text):
-                    # Use native Streamlit markdown to handle LaTeX and formatting properly
                     st.markdown(notes)
 
     with tab2:
