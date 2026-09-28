@@ -38,7 +38,7 @@ if not st.session_state["authenticated"]:
                 st.error("Incorrect PIN. Try again.")
 
 else:
-    # Main App (Post-Login)[cite: 1]
+    # Main App (Post-Login)
     if st.sidebar.button("🔒 Lock App"):
         st.session_state["authenticated"] = False
         st.rerun()
@@ -350,7 +350,9 @@ else:
                     c2.markdown(f"<span style='background-color: {badge_color}; padding: 3px 8px; border-radius: 5px; color: white;'>⏳ {row['Days_Left']} days</span>", unsafe_allow_html=True)
                     c3.markdown(f"📅 {row['start_date']} ({row['start_time'][:5]} → {row['end_time'][:5]})")
                     c4.markdown(f"**{row['effort_type']}** | {row['course']}")
-                    if c5.button("🗑️", key=id := f"del_assess_{row.get('id', idx)}"):
+                    
+                    row_id = row.get('id', idx)
+                    if c5.button("🗑️", key=f"del_assess_{row_id}"):
                         delete_assessment(row["id"])
                         st.rerun()
                 st.divider()
@@ -435,7 +437,6 @@ else:
 
                     header_text = f"**{subj}** ({ts}) — *{f_state}*"
                     with st.expander(header_text):
-                        # Smart check to auto-render HTML vs Markdown[cite: 1]
                         stripped = notes_content.strip().lower()
                         if stripped.startswith("<!doctype") or stripped.startswith("<html") or stripped.startswith("<div"):
                             components.html(notes_content, height=500, scrolling=True)
