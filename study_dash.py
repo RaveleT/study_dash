@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
 import os
 import signal
 import pandas as pd
@@ -45,9 +44,7 @@ else:
         st.rerun()
 
     # ====================== TIME & SESSION STATE ======================
-    # Force local timezone to South African Standard Time (SAST)
-    local_tz = ZoneInfo("Africa/Johannesburg")
-    now = datetime.now(local_tz).replace(tzinfo=None)
+    now = datetime.now()
     today = now.date()
 
     if "t_stop" not in st.session_state:
@@ -89,29 +86,10 @@ else:
         pomodoro_rem = max(0, min(pomodoro_rem_mins, mins_to_session_end))
         tab_percent = int(min(100, max(0, (now - sd).total_seconds() / total_session_seconds * 100)))
 
-    # ====================== GLOBAL BROWSER TAB & TIMER COMPONENT ======================
-    # This component updates the browser tab title dynamically and renders a global sticky summary
-    browser_title_text = f"[{current_mode}] {pomodoro_rem}m left | {tab_percent}% - Study Dash"
-    components.html(f"""
-        <script>
-            // Update browser tab title dynamically
-            parent.document.title = "{browser_title_text}";
-        </script>
-        <div style="background-color: #1e1e1e; color: #ffffff; padding: 10px 15px; border-radius: 8px; font-family: sans-serif; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333;">
-            <div>
-               <span style="font-weight: bold; color: {'#00FF00' if current_mode == 'FOCUS' else ('#00BCFF' if current_mode == 'BREAK' else '#FFD700')}">● {current_mode}</span>
-               <span style="margin-left: 15px;">🍅 Pomodoro: <b>{pomodoro_rem}m</b></span>
-            </div>
-            <div>
-               <span>📊 Progress: <b>{tab_percent}%</b></span>
-            </div>
-        </div>
-    """, height=50)
-
     # ====================== SUPABASE DATABASE FUNCTIONS ======================
     def save_log(subject, test_exam, focus_state, focus_score, duration_minutes, notes):
         supabase.table("logs").insert({
-            "timestamp": datetime.now(ZoneInfo("Africa/Johannesburg")).strftime("%Y-%m-%d %H:%M:%S"),
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "subject": subject,
             "test_exam": test_exam,
             "focus_state": focus_state,
@@ -224,6 +202,39 @@ else:
             trigger_alert("Daily session complete! Great work 🏆", is_milestone=True)
     st.session_state.last_mode = current_mode
 
+    # ====================== FLOATING GLOBAL OVERLAY BAR ======================
+    color_hex = "#00FF00" if current_mode == "FOCUS" else ("#00BCFF" if current_mode == "BREAK" else "#FFD700")
+
+    st.markdown(f"""
+        <style>
+            .floating-status-bar {{
+                position: fixed;
+                top: 60px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 999999;
+                background-color: #161a22;
+                border: 1px solid #30363d;
+                color: #ffffff;
+                padding: 8px 24px;
+                border-radius: 12px;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+                width: 85%;
+                max-width: 900px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                font-family: sans-serif;
+                font-size: 14px;
+            }
+        </style>
+        <div class="floating-status-bar">
+            <div><span style="color: {color_hex}; font-weight: bold; font-size: 16px;">● {current_mode}</span></div>
+            <div>🍅 <b>Pomodoro:</b> {pomodoro_rem}m remaining</div>
+            <div>📊 <b>Progress:</b> {tab_percent}%</div>
+        </div>
+    """, unsafe_allow_html=True)
+
     # ====================== NAVIGATION TABS ======================
     st.title("🔥 Study Dash & Notes Hub")
     st_autorefresh(interval=10000, key="datarefresh", limit=None, debounce=False)
@@ -242,12 +253,10 @@ else:
         col1, col2 = st.columns([1, 2])
         with col1:
             st.subheader("⏱️ Session Status")
-            color = "#00FF00" if current_mode == "FOCUS" else ("#00BCFF" if current_mode == "BREAK" else "#FFD700")
-            label_suffix = " (Session Complete!)" if current_mode == "COMPLETE" else ""
-            st.markdown(f"<h1 style='color: {color};'>{current_mode}{label_suffix}</h1>", unsafe_allow_html=True)
+            st.markdown(f"<h1 style='color: {color_hex};'>{current_mode}</h1>", unsafe_allow_html=True)
 
             elapsed_seconds = (now - sd).total_seconds()
-            total_progress = max(0.0, min(1.0, elapsed_seconds / total_session_seconds))
+            total_progress = max(0.0, min(1.0, elapsed_seconds / total_session_seconds)) if total_session_seconds > 0 else 0
             
             st.metric("🍅 Pomodoro Remaining", f"{pomodoro_rem} minutes")
             st.metric("📊 Global Progress", f"{tab_percent}%", delta=f"{int(elapsed_seconds/60)} of {int(total_session_seconds/60)} min")
@@ -339,9 +348,8 @@ else:
                     start_time = st.time_input("Start Time", value=datetime.strptime("08:00", "%H:%M").time())
                     end_time = st.time_input("End Time", value=datetime.strptime("09:00", "%H:%M").time())
 
-                dur = max(0, int((datetime.combine(today, end_time) - datetime.combine(today, start_time)).total_seconds() / 60))
-
                 if st.form_submit_button("📌 Save Assessment"):
+                    dur = max(0, int((datetime.combine(today, end_time) - datetime.combine(today, start_time)).total_seconds() / 60))
                     if task_name:
                         add_assessment(task_name, course_name, effort, assessment_date, start_time, end_time, dur)
                         st.success(f"Assessment '{task_name}' added successfully!")
@@ -464,13 +472,6 @@ else:
                             components.html(notes_content, height=500, scrolling=True)
                         else:
                             st.markdown(notes_content)
-                        
-                        # Add a delete button for this log entry
-                        log_id = log.get("id")
-                        if log_id and st.button("🗑️ Delete This Log/Note", key=f"del_log_{log_id}"):
-                            supabase.table("logs").delete().eq("id", log_id).execute()
-                            st.success("Log deleted successfully!")
-                            st.rerun()
         else:
             st.warning("No notes stored in Supabase yet.")
 
@@ -502,6 +503,7 @@ else:
                     st.warning("Please select a file to upload.")
 
     # ====================== SIDEBAR ======================
+    st.sidebar.divider()
     st.sidebar.subheader("⚙️ System Control")
     if st.sidebar.button("🚨 STOP APP PROCESS"):
         os.kill(os.getpid(), signal.SIGTERM)
@@ -513,7 +515,6 @@ else:
     st.sidebar.write(f"**Start Time:** {st.session_state.t_start.strftime('%I:%M %p')}")
     st.sidebar.write(f"**End Time:** {st.session_state.t_stop.strftime('%I:%M %p')}")
     st.sidebar.write(f"**Progress:** {tab_percent}%")
-    st.sidebar.write(f"**Pomodoro Left:** {pomodoro_rem}m")
 
     history_sidebar = load_logs()
     total_today = 0
