@@ -464,6 +464,13 @@ else:
                             components.html(notes_content, height=500, scrolling=True)
                         else:
                             st.markdown(notes_content)
+                        
+                        # Add a delete button for this log entry
+                        log_id = log.get("id")
+                        if log_id and st.button("🗑️ Delete This Log/Note", key=f"del_log_{log_id}"):
+                            supabase.table("logs").delete().eq("id", log_id).execute()
+                            st.success("Log deleted successfully!")
+                            st.rerun()
         else:
             st.warning("No notes stored in Supabase yet.")
 
