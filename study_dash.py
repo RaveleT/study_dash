@@ -89,6 +89,25 @@ else:
         pomodoro_rem = max(0, min(pomodoro_rem_mins, mins_to_session_end))
         tab_percent = int(min(100, max(0, (now - sd).total_seconds() / total_session_seconds * 100)))
 
+    # ====================== GLOBAL BROWSER TAB & TIMER COMPONENT ======================
+    # This component updates the browser tab title dynamically and renders a global sticky summary
+    browser_title_text = f"[{current_mode}] {pomodoro_rem}m left | {tab_percent}% - Study Dash"
+    components.html(f"""
+        <script>
+            // Update browser tab title dynamically
+            parent.document.title = "{browser_title_text}";
+        </script>
+        <div style="background-color: #1e1e1e; color: #ffffff; padding: 10px 15px; border-radius: 8px; font-family: sans-serif; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333;">
+            <div>
+               <span style="font-weight: bold; color: {'#00FF00' if current_mode == 'FOCUS' else ('#00BCFF' if current_mode == 'BREAK' else '#FFD700')}">● {current_mode}</span>
+               <span style="margin-left: 15px;">🍅 Pomodoro: <b>{pomodoro_rem}m</b></span>
+            </div>
+            <div>
+               <span>📊 Progress: <b>{tab_percent}%</b></span>
+            </div>
+        </div>
+    """, height=50)
+
     # ====================== SUPABASE DATABASE FUNCTIONS ======================
     def save_log(subject, test_exam, focus_state, focus_score, duration_minutes, notes):
         supabase.table("logs").insert({
