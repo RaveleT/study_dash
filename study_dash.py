@@ -226,7 +226,7 @@ else:
                 align-items: center;
                 font-family: sans-serif;
                 font-size: 14px;
-            }
+            }}
         </style>
         <div class="floating-status-bar">
             <div><span style="color: {color_hex}; font-weight: bold; font-size: 16px;">● {current_mode}</span></div>
