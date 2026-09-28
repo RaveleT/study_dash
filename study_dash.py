@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import os
 import signal
 import pandas as pd
@@ -11,6 +12,9 @@ from supabase import Client, create_client
 
 # ====================== CONFIG & SUPABASE ======================
 st.set_page_config(page_title="Study Dash & Notes", page_icon="🔥", layout="wide")
+
+# Timezone definition for South Africa (Johannesburg)
+SA_TZ = ZoneInfo("Africa/Johannesburg")
 
 # Initialize Supabase Client using your credentials format
 url = st.secrets["SUPABASE_URL"]
@@ -44,13 +48,13 @@ else:
         st.rerun()
 
     # ====================== TIME & SESSION STATE ======================
-    now = datetime.now()
+    now = datetime.now(SA_TZ)
     today = now.date()
 
     if "t_stop" not in st.session_state:
-        st.session_state.t_stop = now.replace(hour=18, minute=0, second=0).time()
+        st.session_state.t_stop = now.replace(hour=18, minute=0, second=0, microsecond=0).time()
     if "t_start" not in st.session_state:
-        st.session_state.t_start = now.replace(hour=8, minute=0, second=0).time()
+        st.session_state.t_start = now.replace(hour=8, minute=0, second=0, microsecond=0).time()
     if "triggered_milestones" not in st.session_state:
         st.session_state.triggered_milestones = set()
     if "last_mode" not in st.session_state:
@@ -65,9 +69,9 @@ else:
             "General Notes"
         ]
 
-    # Timing parameters
-    sd = datetime.combine(today, st.session_state.t_start)
-    ed = datetime.combine(today, st.session_state.t_stop)
+    # Timing parameters (localized to SAST)
+    sd = datetime.combine(today, st.session_state.t_start, tzinfo=SA_TZ)
+    ed = datetime.combine(today, st.session_state.t_stop, tzinfo=SA_TZ)
     total_session_seconds = max(1.0, (ed - sd).total_seconds())
 
     if now >= ed:
@@ -89,7 +93,7 @@ else:
     # ====================== SUPABASE DATABASE FUNCTIONS ======================
     def save_log(subject, test_exam, focus_state, focus_score, duration_minutes, notes):
         supabase.table("logs").insert({
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "timestamp": datetime.now(SA_TZ).strftime("%Y-%m-%d %H:%M:%S"),
             "subject": subject,
             "test_exam": test_exam,
             "focus_state": focus_state,
@@ -100,11 +104,12 @@ else:
 
     def load_logs():
         try:
-            response = supabase.table("logs").select("*").order("id", desc=True).execute()
+            response = supabase.table("logs").select("id, timestamp, subject, test_exam, focus_state, focus_score, duration_minutes, notes").order("id", desc=True).execute()
             if not response.data:
-                return pd.DataFrame(columns=["timestamp", "subject", "test_exam", "focus_state", "focus_score", "duration_minutes", "notes"])
+                return pd.DataFrame(columns=["ID", "Timestamp", "Subject", "Test_Exam", "Focus_State", "Focus_Score", "Duration_Minutes", "Notes"])
             df = pd.DataFrame(response.data)
             df = df.rename(columns={
+                "id": "ID",
                 "timestamp": "Timestamp",
                 "subject": "Subject",
                 "test_exam": "Test_Exam",
@@ -115,7 +120,10 @@ else:
             })
             return df
         except Exception:
-            return pd.DataFrame(columns=["Timestamp", "Subject", "Test_Exam", "Focus_State", "Focus_Score", "Duration_Minutes", "Notes"])
+            return pd.DataFrame(columns=["ID", "Timestamp", "Subject", "Test_Exam", "Focus_State", "Focus_Score", "Duration_Minutes", "Notes"])
+
+    def delete_log(log_id):
+        supabase.table("logs").delete().eq("id", log_id).execute()
 
     def add_assessment(task, course, effort_type, start_date, start_time, end_time, duration_mins):
         supabase.table("assessments").insert({
@@ -169,7 +177,7 @@ else:
             days_ahead += 7
         elif days_ahead == 0 and current_dt.time() >= target_time:
             days_ahead += 7
-        return datetime.combine(current_dt.date() + timedelta(days=days_ahead), target_time)
+        return datetime.combine(current_dt.date() + timedelta(days=days_ahead), target_time, tzinfo=SA_TZ)
 
     def format_time_remaining(time_delta):
         total_seconds = int(time_delta.total_seconds())
@@ -421,7 +429,7 @@ else:
                 s_time_str = row["start_time"][:5]
                 e_time_str = row["end_time"][:5]
                 class_start_dt = get_next_class_datetime(now, day_num, row["start_time"])
-                class_end_dt = datetime.combine(class_start_dt.date(), datetime.strptime(e_time_str, "%H:%M").time())
+                class_end_dt = datetime.combine(class_start_dt.date(), datetime.strptime(e_time_str, "%H:%M").time(), tzinfo=SA_TZ)
 
                 is_today = (now.weekday() == day_num)
                 if is_today and s_time_str <= now.strftime("%H:%M") <= e_time_str:
@@ -464,14 +472,24 @@ else:
                     ts = log.get("Timestamp", "Recent")
                     f_state = log.get("Focus_State", "Standard")
                     notes_content = log.get("Notes", "No content provided.")
+                    log_id = log.get("ID")
 
                     header_text = f"**{subj}** ({ts}) — *{f_state}*"
-                    with st.expander(header_text):
-                        stripped = notes_content.strip().lower()
-                        if stripped.startswith("<!doctype") or stripped.startswith("<html") or stripped.startswith("<div"):
-                            components.html(notes_content, height=500, scrolling=True)
-                        else:
-                            st.markdown(notes_content)
+                    
+                    col_expander, col_del = st.columns([10, 1])
+                    with col_expander:
+                        with st.expander(header_text):
+                            stripped = notes_content.strip().lower()
+                            if stripped.startswith("<!doctype") or stripped.startswith("<html") or stripped.startswith("<div"):
+                                components.html(notes_content, height=500, scrolling=True)
+                            else:
+                                st.markdown(notes_content)
+                    with col_del:
+                        st.write("")
+                        if log_id and st.button("🗑️", key=f"del_log_{log_id}", help="Delete this log"):
+                            delete_log(log_id)
+                            st.success("Log deleted!")
+                            st.rerun()
         else:
             st.warning("No notes stored in Supabase yet.")
 
@@ -524,4 +542,4 @@ else:
         total_today = int(today_logs["Duration_Minutes"].sum()) if not today_logs.empty else 0
 
     st.sidebar.metric("⏱️ Total Studied Today", f"{total_today} minutes")
-    st.sidebar.caption(f"🔄 Auto-refresh: 10s | Mode: {current_mode}")
+    st.sidebar.caption(f"🔄 Auto-refresh: 10s | Mode: {current_mode} (SAST)")
