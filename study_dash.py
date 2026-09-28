@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import os
 import signal
 import pandas as pd
@@ -44,7 +45,9 @@ else:
         st.rerun()
 
     # ====================== TIME & SESSION STATE ======================
-    now = datetime.now()
+    # Force local timezone to South African Standard Time (SAST)
+    local_tz = ZoneInfo("Africa/Johannesburg")
+    now = datetime.now(local_tz).replace(tzinfo=None)
     today = now.date()
 
     if "t_stop" not in st.session_state:
@@ -89,7 +92,7 @@ else:
     # ====================== SUPABASE DATABASE FUNCTIONS ======================
     def save_log(subject, test_exam, focus_state, focus_score, duration_minutes, notes):
         supabase.table("logs").insert({
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "timestamp": datetime.now(ZoneInfo("Africa/Johannesburg")).strftime("%Y-%m-%d %H:%M:%S"),
             "subject": subject,
             "test_exam": test_exam,
             "focus_state": focus_state,
