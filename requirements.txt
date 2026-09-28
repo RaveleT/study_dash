@@ -1,4 +1,5 @@
 streamlit
+streamlit-autorefresh
 pandas
 huggingface_hub
 supabase
@@ -6,3 +7,5 @@ matplotlib
 plotly
 markdown 
 python-markdown-math
+
+
